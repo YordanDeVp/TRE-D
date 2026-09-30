@@ -1,0 +1,1247 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TRE-D: comprobación manual de entrega",
+    "version": "0.3.0",
+    "description": "Contrato T9a para RF-07, RF-14, RF-16 y RN-08. El administrador consulta las aplicaciones de inDrive, Olva o Shalom. Ninguna operación de este contrato crea pedidos, reservas de stock o cobros. El inicio del pago se definirá en el contrato de pedidos: en la compra inicial, el cliente acepta el total e inicia en ese momento un pago conjunto de productos y envío; si agrega envío a un pedido de recojo ya pagado, inicia un pago separado por ese envío al aceptar la propuesta. Ambos inicios deben revalidar carrito, stock, entrega e importe según su caso. Para inDrive, la comprobación confirmada permite iniciar el pago durante 15 minutos desde resolvedAt. Si el cliente vuelve en un nuevo intento de checkout, requiere otra consulta aun antes de ese vencimiento. El plazo de tarifa es independiente de la reserva de stock. Para inDrive, AVAILABLE significa que el administrador consultó un estimado para la dirección; no se ha solicitado el viaje ni se ha asignado conductor. El viaje real se solicita después de confirmar el pago y preparar el pedido; el precio de envío aceptado no cambia al solicitarlo. Si no hay conductor, se aplica RF-21."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Entrega cliente"
+    },
+    {
+      "name": "Entrega administración"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/carts/{cartId}/delivery-checks": {
+      "post": {
+        "tags": [
+          "Entrega cliente"
+        ],
+        "operationId": "requestDeliveryCheck",
+        "summary": "Solicitar comprobación manual de cobertura y tarifa",
+        "description": "Solo el propietario del carrito. El backend valida que el destino y operador pertenezcan al ámbito habilitado; un nombre de zona o departamento no garantiza cobertura. Devuelve PENDING y permite escoger recojo gratuito mientras se espera. Si cambian destino, operador o contenido del carrito, la solicitud anterior pasa a SUPERSEDED y se solicita otra. No se reserva stock ni se inicia pago. La solicitud queda vinculada al intento de checkout activo. Si el comprador vuelve en un intento nuevo sin haber iniciado pago, la comprobación anterior queda SUPERSEDED y se consulta otra vez, especialmente en inDrive. Para inDrive, esta operación pide un estimado de precio, no solicita todavía un conductor.",
+        "parameters": [
+          {
+            "name": "cartId",
+            "in": "path",
+            "required": true,
+            "description": "Carrito del cliente autenticado.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "La misma clave y cuerpo devuelven el mismo resultado; una clave reutilizada con otro cuerpo produce 409.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Solicitud pendiente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryCheck"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/carts/{cartId}/delivery-checks/{checkId}": {
+      "get": {
+        "tags": [
+          "Entrega cliente"
+        ],
+        "operationId": "getDeliveryCheck",
+        "summary": "Consultar el resultado de una comprobación",
+        "description": "Solo el propietario del carrito. PENDING muestra exactamente el mensaje acordado; AVAILABLE incluye tarifa fijada; UNAVAILABLE permite elegir recojo gratuito. La resolución genera un aviso privado en la cuenta con enlace al checkout; WhatsApp, si se usa, es un aviso manual opcional. EXPIRED significa que pasaron 15 minutos desde la confirmación de inDrive sin iniciar pago; se necesita otra consulta.",
+        "parameters": [
+          {
+            "name": "cartId",
+            "in": "path",
+            "required": true,
+            "description": "Carrito del cliente autenticado.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "checkId",
+            "in": "path",
+            "required": true,
+            "description": "Solicitud de comprobación.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryCheck"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/admin/delivery-checks": {
+      "get": {
+        "tags": [
+          "Entrega administración"
+        ],
+        "operationId": "listDeliveryChecks",
+        "summary": "Listar solicitudes para revisión",
+        "description": "Solo administradores. La aplicación del courier se consulta fuera del sistema y el resultado se registra por separado.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "AVAILABLE",
+                "UNAVAILABLE",
+                "SUPERSEDED",
+                "EXPIRED"
+              ],
+              "default": "PENDING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Solicitudes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeliveryCheck"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/admin/delivery-checks/{checkId}/result": {
+      "post": {
+        "tags": [
+          "Entrega administración"
+        ],
+        "operationId": "recordDeliveryCheckResult",
+        "summary": "Registrar cobertura y tarifa consultadas",
+        "description": "Solo administradores. Se registra responsable y hora desde el servidor. AVAILABLE exige un importe en céntimos de PEN; UNAVAILABLE no admite importe. Una tarifa AVAILABLE queda inmutable para esa comprobación. Un reintento idéntico es seguro; intentar resolverla con otro resultado o resolver una SUPERSEDED produce 409. La cobertura se confirma para la residencia concreta. Para inDrive, el servidor calcula expiresAt como resolvedAt más 15 minutos. Este vencimiento solo impide iniciar un pago nuevo; un intento iniciado a tiempo conserva su importe. En inDrive, feeMinor es el estimado puntual que se mostrará al cliente y AVAILABLE no representa un viaje reservado.",
+        "parameters": [
+          {
+            "name": "checkId",
+            "in": "path",
+            "required": true,
+            "description": "Solicitud de comprobación.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "La misma clave y cuerpo devuelven el mismo resultado; una clave reutilizada con otro cuerpo produce 409.",
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryResultRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado registrado o repetido idénticamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryCheck"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/carts/{cartId}/checkout-preview": {
+      "post": {
+        "tags": [
+          "Entrega cliente"
+        ],
+        "operationId": "previewCheckout",
+        "summary": "Calcular el total antes de iniciar el pago",
+        "description": "Solo el propietario del carrito. PICKUP aplica S/ 0 aun si hay una solicitud de envío pendiente. DELIVERY exige una comprobación AVAILABLE para el mismo carrito, destino y operador; PENDING, UNAVAILABLE, SUPERSEDED o EXPIRED devuelven 409. El checkoutAttemptId debe corresponder al intento activo y a la comprobación de entrega. El backend lee precios y cantidades del carrito y calcula el total; no acepta una tarifa enviada por el navegador. Esta vista previa no reserva stock ni cobra. Al aceptar el total, el cliente inicia en ese momento el pago conjunto de productos y envío; el endpoint de pedidos debe recibir esa aceptación y revalidar todo atómicamente. Si el cliente rechaza el estimado de inDrive, elige PICKUP, cuyo costo de entrega es cero; el pedido de recojo solo existe después de pagar los productos.",
+        "parameters": [
+          {
+            "name": "cartId",
+            "in": "path",
+            "required": true,
+            "description": "Carrito del cliente autenticado.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Total calculado por el servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutPreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/carts/{cartId}/checkout-attempts": {
+      "post": {
+        "tags": [
+          "Entrega cliente"
+        ],
+        "operationId": "startCheckoutAttempt",
+        "summary": "Iniciar una visita al checkout",
+        "description": "Solo el propietario del carrito. Al entrar o volver al checkout, el servidor crea un intento activo nuevo y reemplaza el anterior. Las comprobaciones del intento previo no habilitan un pago nuevo. Una llamada repetida con la misma Idempotency-Key devuelve el mismo intento. El recojo gratuito continúa disponible.",
+        "parameters": [
+          {
+            "name": "cartId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Intento activo creado o repetido idénticamente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutAttempt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/delivery/options": {
+      "get": {
+        "tags": [
+          "Entrega cliente"
+        ],
+        "operationId": "listDeliveryOptions",
+        "summary": "Mostrar opciones candidatas antes de solicitar comprobación",
+        "description": "Consulta pública sin dirección de calle ni datos personales. Recojo gratuito siempre disponible. En Arequipa ciudad se muestran zonas locales habilitadas y, si se selecciona una, inDrive como candidato; fuera de la ciudad dentro de la región Arequipa o en Apurímac, Cusco, Madre de Dios, Moquegua, Puno y Tacna se muestran Olva y Shalom habilitados como candidatos. Un candidato no confirma cobertura residencial ni tarifa; el cliente debe crear una DeliveryCheck y esperar la comprobación manual antes de pagar por envío. Un destino fuera del ámbito devuelve solo recojo. El backend no presupone cobertura por el nombre de un distrito o departamento.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "department",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "province",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "district",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "zoneId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recojo y candidatos todavía no verificados.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryOptions"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/admin/delivery-zones": {
+      "get": {
+        "tags": [
+          "Entrega administración"
+        ],
+        "operationId": "listDeliveryZones",
+        "summary": "Listar zonas locales y su estado",
+        "description": "Solo administradores. Las ocho zonas iniciales de RF-07 son etiquetas configurables, sin mapa ni cobertura automática.",
+        "responses": {
+          "200": {
+            "description": "Zonas locales.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeliveryZone"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/admin/delivery-zones/{zoneId}": {
+      "put": {
+        "tags": [
+          "Entrega administración"
+        ],
+        "operationId": "setDeliveryZoneEnabled",
+        "summary": "Habilitar o deshabilitar una zona local",
+        "description": "Solo administradores. PUT con el mismo cuerpo es idempotente. El servidor registra autor y hora solo al cambiar el estado. Deshabilitar impide nuevas solicitudes, pero no altera importes ni pedidos históricos o intentos de pago ya iniciados. El nombre de una zona habilitada no confirma cobertura de una dirección.",
+        "parameters": [
+          {
+            "name": "zoneId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvailabilityUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estado vigente de la zona.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryZone"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    },
+    "/v1/admin/delivery-operators": {
+      "get": {
+        "tags": [
+          "Entrega administración"
+        ],
+        "operationId": "listDeliveryOperators",
+        "summary": "Listar operadores y su estado",
+        "description": "Solo administradores. INDRIVE aplica a las zonas locales de Arequipa; OLVA y SHALOM al ámbito provincial definido en RF-07.",
+        "responses": {
+          "200": {
+            "description": "Operadores de la demo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeliveryOperatorConfig"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/admin/delivery-operators/{operator}": {
+      "put": {
+        "tags": [
+          "Entrega administración"
+        ],
+        "operationId": "setDeliveryOperatorEnabled",
+        "summary": "Habilitar o deshabilitar un operador",
+        "description": "Solo administradores. El parámetro acepta INDRIVE, OLVA o SHALOM. PUT con el mismo cuerpo es idempotente. El servidor registra autor y hora solo si cambia el estado. Deshabilitar impide nuevas solicitudes sin modificar pagos, tarifas ni pedidos históricos.",
+        "parameters": [
+          {
+            "name": "operator",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INDRIVE",
+                "OLVA",
+                "SHALOM"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvailabilityUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estado vigente del operador.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryOperatorConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token de Supabase Auth; Express valida identidad, propiedad y rol."
+      }
+    },
+    "schemas": {
+      "Destination": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recipientName",
+          "phone",
+          "addressLine",
+          "district",
+          "province",
+          "department"
+        ],
+        "properties": {
+          "recipientName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 30
+          },
+          "addressLine": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 240
+          },
+          "reference": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "district": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "province": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "department": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Obligatorio solo al solicitar INDRIVE; la etiqueta no prueba cobertura de la dirección, que valida el administrador."
+          }
+        }
+      },
+      "DeliveryCheckRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator",
+          "destination",
+          "checkoutAttemptId"
+        ],
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "INDRIVE",
+              "OLVA",
+              "SHALOM"
+            ]
+          },
+          "destination": {
+            "$ref": "#/components/schemas/Destination"
+          },
+          "checkoutAttemptId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Intento de checkout activo creado por el servidor."
+          }
+        },
+        "description": "Para INDRIVE, destination.zoneId es obligatorio y debe identificar una zona habilitada; para Olva o Shalom se omite. El servidor valida el ámbito y la dirección completa antes de solicitar comprobación manual."
+      },
+      "DeliveryCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkId",
+          "cartId",
+          "operator",
+          "destination",
+          "status",
+          "requestedAt",
+          "checkoutAttemptId"
+        ],
+        "properties": {
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cartId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "INDRIVE",
+              "OLVA",
+              "SHALOM"
+            ]
+          },
+          "destination": {
+            "$ref": "#/components/schemas/Destination"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "AVAILABLE",
+              "UNAVAILABLE",
+              "SUPERSEDED",
+              "EXPIRED"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Si status es PENDING, valor literal: Estamos calculando el costo de envío. Aún no se realizó ningún cobro"
+          },
+          "feeMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Importe en céntimos de PEN ofrecido al cliente; para inDrive es un estimado consultado, sin conductor asignado. Solo para AVAILABLE."
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkoutAttemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Solo para inDrive confirmado: 15 minutos después de resolvedAt, salvo que el pago ya se haya iniciado."
+          }
+        }
+      },
+      "DeliveryAvailableResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "feeMinor"
+        ],
+        "properties": {
+          "status": {
+            "const": "AVAILABLE"
+          },
+          "feeMinor": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Céntimos de PEN consultados en la app; en inDrive son el importe cotizado al cliente que queda fijo para el pedido si inicia el pago dentro del plazo."
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "DeliveryUnavailableResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "UNAVAILABLE"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "DeliveryResultRequest": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DeliveryAvailableResult"
+          },
+          {
+            "$ref": "#/components/schemas/DeliveryUnavailableResult"
+          }
+        ]
+      },
+      "PickupChoice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "const": "PICKUP"
+          }
+        }
+      },
+      "ShippingChoice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "checkId"
+        ],
+        "properties": {
+          "mode": {
+            "const": "DELIVERY"
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CheckoutPreviewRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "choice",
+          "checkoutAttemptId"
+        ],
+        "properties": {
+          "choice": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PickupChoice"
+              },
+              {
+                "$ref": "#/components/schemas/ShippingChoice"
+              }
+            ]
+          },
+          "checkoutAttemptId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Intento activo del checkout; uno anterior no autoriza la tarifa."
+          }
+        }
+      },
+      "CheckoutPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "previewId",
+          "currency",
+          "subtotalMinor",
+          "deliveryFeeMinor",
+          "totalMinor",
+          "mode",
+          "stockReserved"
+        ],
+        "properties": {
+          "previewId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Referencia que deberá presentarse al iniciar el pedido; no garantiza precio ni stock."
+          },
+          "currency": {
+            "const": "PEN"
+          },
+          "subtotalMinor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deliveryFeeMinor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalMinor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "PICKUP",
+              "DELIVERY"
+            ]
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Presente solo para DELIVERY."
+          },
+          "stockReserved": {
+            "const": false
+          }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "CheckoutAttempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "attemptId",
+          "cartId",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "attemptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cartId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "SUPERSEDED",
+              "COMPLETED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryArea": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "department",
+          "province",
+          "district"
+        ],
+        "properties": {
+          "department": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "province": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "district": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "zoneId": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "description": "Etiqueta local elegida en Arequipa ciudad; no demuestra cobertura de la dirección."
+          }
+        }
+      },
+      "DeliveryZoneOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "zoneId",
+          "label"
+        ],
+        "properties": {
+          "zoneId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "DeliveryCandidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator",
+          "requiresManualCheck",
+          "coverageConfirmed",
+          "feeConfirmed"
+        ],
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "INDRIVE",
+              "OLVA",
+              "SHALOM"
+            ]
+          },
+          "requiresManualCheck": {
+            "const": true
+          },
+          "coverageConfirmed": {
+            "const": false
+          },
+          "feeConfirmed": {
+            "const": false
+          }
+        }
+      },
+      "PickupOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "feeMinor",
+          "reference",
+          "openingHours"
+        ],
+        "properties": {
+          "mode": {
+            "const": "PICKUP"
+          },
+          "feeMinor": {
+            "const": 0
+          },
+          "reference": {
+            "type": "string",
+            "const": "La Gran Vía / galería Compucenter, Arequipa"
+          },
+          "openingHours": {
+            "type": "string",
+            "description": "Lunes a sábado de 10:00 a 20:00, excepto feriados y cierres extraordinarios publicados."
+          }
+        }
+      },
+      "DeliveryOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "area",
+          "pickup",
+          "localZones",
+          "deliveryCandidates"
+        ],
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/DeliveryArea"
+          },
+          "pickup": {
+            "$ref": "#/components/schemas/PickupOption"
+          },
+          "localZones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryZoneOption"
+            }
+          },
+          "deliveryCandidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryCandidate"
+            }
+          }
+        }
+      },
+      "DeliveryZone": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "zoneId",
+          "label",
+          "enabled",
+          "updatedAt"
+        ],
+        "properties": {
+          "zoneId": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryOperatorConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operator",
+          "scope",
+          "enabled",
+          "updatedAt"
+        ],
+        "properties": {
+          "operator": {
+            "type": "string",
+            "enum": [
+              "INDRIVE",
+              "OLVA",
+              "SHALOM"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "AREQUIPA_CITY",
+              "PROVINCIAL"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AvailabilityUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "No hay sesión válida.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "El usuario no tiene permiso.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Recurso inexistente o no visible para este usuario.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Estado incompatible; por ejemplo, solicitud pendiente, sin cobertura, reemplazada o total obsoleto.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "Destino, operador o datos inválidos.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      }
+    }
+  }
+}
