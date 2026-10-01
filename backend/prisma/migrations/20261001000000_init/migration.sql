@@ -1,0 +1,2 @@
+-- The database is intentionally empty at this baseline.
+-- Domain tables are introduced by their owning implementation tasks.
