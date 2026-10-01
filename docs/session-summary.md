@@ -22,7 +22,8 @@
 - La migración `20261001000000_init` quedó aplicada y `db:migrate:status` informó que no hay migraciones pendientes. Todavía no existen tablas de negocio; solo está el historial de Prisma.
 - `test:db` aprobó una consulta real mediante Prisma (1 prueba, 0 fallos) contra PostgreSQL 17.11. También se verificaron validación y generación de Prisma, lint, tipos, prueba de salud y compilación del backend.
 - La configuración lee `.env` de la raíz; ese archivo y el cliente generado están ignorados por Git. `.env.example` conserva una contraseña ficticia.
-- La instalación de dependencias informó 4 vulnerabilidades altas. Su revisión queda pendiente; no se aplicaron correcciones automáticas.
+- Las 4 alertas altas de dependencias se corrigieron con overrides para deepmerge-ts 8.0.2 y mysql2 3.24.5. La reinstalación y auditoría del backend reportaron 0 vulnerabilidades; lint, tipos, salud, conexión real, compilación y estado de migraciones pasaron. La evidencia y los avisos de instalación pendientes están en [dependency-security.md](dependency-security.md). El usuario aprobó cuatro commits separados para las correcciones y la publicación de la rama `feature/mvp-foundation` en GitHub.
+- ESLint del backend se actualizó a 10.11.0 y @eslint/js a 10.0.1, con reinstalación, auditoría (0 vulnerabilidades), lint, tipos, salud, conexión real y compilación aprobados. El frontend conserva ESLint 9.39.5 porque los plugins publicados de React y accesibilidad todavía declaran compatibilidad hasta 9; su migración y la autorización del script de esbuild siguen pendientes.
 
 ## Forma de trabajo acordada
 
