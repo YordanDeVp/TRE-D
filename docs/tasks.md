@@ -8,8 +8,9 @@ Cada tarea debe dividirse en entregables verificables de hasta 30 minutos cuando
 - [x] **T1 — Inicializar frontend y backend** · RF/RN: arquitectura · Archivos: `frontend/package.json`, `backend/package.json`, `.env.example`<br>
   **Hecho cuando:** funcionan los scripts de instalación, desarrollo, lint, tipos y tests documentados en el README.
 
-- [ ] **T2 — Configurar Prisma y PostgreSQL** · RNF-04 · Archivos: `backend/prisma/schema.prisma`, migraciones, configuración de test<br>
-  **Hecho cuando:** la migración crea una base vacía y las pruebas usan PostgreSQL real.
+- [x] **T2 — Configurar Prisma y PostgreSQL** · RNF-04 · Archivos: `backend/prisma/schema.prisma`, migraciones, configuración de test<br>
+  **Hecho cuando:** existe una base vacía de tablas de negocio, la migración inicial está aplicada y las pruebas usan PostgreSQL real.<br>
+  **Evidencia (2026-10-01):** `repuestos_3d_dev` creada en PostgreSQL 17.11; migración `20261001000000_init` aplicada, sin pendientes; `test:db` aprobado (1 prueba, 0 fallos). Prisma 7.10.0 validado y generado; lint, tipos, prueba de salud y compilación del backend aprobados. Los modelos y las pruebas de concurrencia se completarán en sus respectivas tareas.
 
 - [ ] **T3 — Modelo de identidad y roles** · RF-01, RF-02, RNF-03 · Módulo: `backend/accounts`<br>
   **Hecho cuando:** registro, sesión, recuperación y rol cliente validan sesión y no permiten crear administradores públicamente.
