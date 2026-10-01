@@ -104,6 +104,7 @@
 
 - T0 completada: constitución y plan revisados frente al PRD y aprobados como base técnica del MVP.
 - T9a completada: contrato OpenAPI de entrega con estados, permisos, errores e idempotencia; validación estructural de 11 operaciones y 68 referencias internas.
-- T1 completada: frontend y backend arrancan; npm ci, lint, tipos, pruebas y compilación fueron verificados. Sigue T2, Prisma y PostgreSQL.
+- T1 completada: frontend y backend arrancan; npm ci, lint, tipos, pruebas y compilación fueron verificados.
+- T2 completada (RNF-04, 2026-10-01): Prisma 7.10.0 conectado al servicio local PostgreSQL 17.11; base `repuestos_3d_dev`, migración inicial aplicada y prueba de conexión real aprobada. El punto de partida contiene solo el historial de migraciones; los modelos de negocio y las pruebas de concurrencia se añaden en sus tareas. Sigue T3, modelo de identidad y roles, previa aprobación del usuario.
 - Definir en OpenAPI los contratos de los demás módulos antes de implementarlos.
 - Verificar en el entorno de prueba de Mercado Pago el medio diferido de tres días y el reembolso del componente de envío antes de cerrar las tareas de pagos; si la pasarela no permite simular el reembolso parcial, usar la simulación prevista en docs/spec.md.
